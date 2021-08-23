@@ -1759,6 +1759,7 @@ WorkerLoadInfo::StealFrom(WorkerLoadInfo& aOther)
   mPrincipalInfo = aOther.mPrincipalInfo.forget();
 
   mDomain = aOther.mDomain;
+  mOrigin = aOther.mOrigin;
   mServiceWorkerCacheName = aOther.mServiceWorkerCacheName;
   mWindowID = aOther.mWindowID;
   mServiceWorkerID = aOther.mServiceWorkerID;
@@ -3623,6 +3624,8 @@ WorkerPrivateParent<Derived>::SetPrincipal(nsIPrincipal* aPrincipal,
   mLoadInfo.mPrincipalInfo = new PrincipalInfo();
   mLoadInfo.mOriginAttributes = nsContentUtils::GetOriginAttributes(aLoadGroup);
 
+  nsContentUtils::GetUTFOrigin(aPrincipal, mLoadInfo.mOrigin);
+
   MOZ_ALWAYS_SUCCEEDS(
     PrincipalToPrincipalInfo(aPrincipal, mLoadInfo.mPrincipalInfo));
 }
@@ -4339,6 +4342,11 @@ WorkerPrivate::Constructor(JSContext* aCx,
     return nullptr;
   }
 
+  // From this point on (worker thread has been started) we
+  // must keep ourself alive. We can now only be cleared by
+  // ClearSelfAndParentEventTargetRef().
+  worker->mSelfRef = worker;
+
   worker->EnableDebugger();
 
   RefPtr<CompileScriptRunnable> compiler =
@@ -4347,8 +4355,6 @@ WorkerPrivate::Constructor(JSContext* aCx,
     aRv.Throw(NS_ERROR_UNEXPECTED);
     return nullptr;
   }
-
-  worker->mSelfRef = worker;
 
   return worker.forget();
 }
